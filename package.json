@@ -1,0 +1,33 @@
+{
+  "name": "xrpl-testnet-liquidity-bot",
+  "version": "0.0.1",
+  "description": "Bot adding liquidity for specific currencies on the xrpl testnet",
+  "main": "bot.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nixer89/xrpl-testnet-liquidity-bot.git"
+  },
+  "author": "Daniel Siedentopf",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nixer89/xrpl-testnet-liquidity-bot/issues"
+  },
+  "homepage": "https://github.com/nixer89/xrpl-testnet-liquidity-bot#readme",
+  "devDependencies": {
+    "@types/node-fetch": "^2.6.3",
+    "@types/node-schedule": "^2.1.0",
+    "node": "^16.20.0",
+    "typescript": "^5.0.4"
+  },
+  "dependencies": {
+    "log-timestamp": "^0.3.0",
+    "node-fetch": "^2.6.9",
+    "node-schedule": "^2.1.1",
+    "xrpl": "^2.7.0",
+    "xrpl-client": "^2.0.11"
+  }
+}
