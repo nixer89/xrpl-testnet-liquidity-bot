@@ -1,15 +1,17 @@
-import { Client, AccountLinesRequest, AccountOffersRequest, OfferCreate, Wallet, OfferCancel, OfferCreateFlags, AccountOffer, qualityToDecimal, dropsToXrp, xrpToDrops } from 'xrpl';
+import { Client, AccountLinesRequest, AccountOffersRequest, OfferCreate, Wallet, OfferCancel, OfferCreateFlags, AccountOffer, dropsToXrp, xrpToDrops, Payment, SubscribeRequest, TransactionStream } from 'xrpl';
 import { XrplClient } from 'xrpl-client';
 import { scheduleJob } from 'node-schedule';
 import { Trustline } from 'xrpl/dist/npm/models/methods/accountLines';
 import * as fetch from 'node-fetch';
+import { isCreatedNode } from 'xrpl/dist/npm/models/transactions/metadata';
 
 let livenetClient = new XrplClient();
 let testnetClient = new XrplClient(['wss://testnet.xrpl-labs.com/', 'wss://s.altnet.rippletest.net:51233/']);
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
 let latestLiveRates:Map<string, number> = new Map();
-let submitClient = new Client('wss://s.altnet.rippletest.net')
+let submitClient = new Client('wss://s.altnet.rippletest.net');
+let sendTokensClient = new Client('wss://s.altnet.rippletest.net');
 let sellWallAmountInXrp:number = 100000;
 
 require("log-timestamp");
@@ -19,6 +21,18 @@ async function start() {
 
     await watchLiveRates();
     await checkOffers();
+
+    let subscribeAccount:SubscribeRequest = {
+        command: 'subscribe',
+        accounts: [wallet.classicAddress]
+    }
+
+    testnetClient.on('transaction', trx => {
+        handleIncomingTrustline(trx);
+    });
+
+    await testnetClient.send(subscribeAccount);
+
     scheduleJob('xrplLiveRateOracle', { second: 0 } , () => watchLiveRates());
     scheduleJob('checkOffers', { second: 10 } , () => checkOffers());
 
@@ -290,6 +304,109 @@ async function cancelOldOffer(sequence:number) {
         //try again!
         await submitClient.submit(offerCancel, {wallet: wallet, autofill: true})
     }
+}
+
+async function handleIncomingTrustline(transaction:any) {
+
+    try {
+        if(transaction) {
+            let parsedTrx:TransactionStream = transaction;
+
+            if(parsedTrx.engine_result === 'tesSUCCESS' && parsedTrx.transaction.TransactionType === 'TrustSet') {
+                if(parsedTrx.meta && typeof parsedTrx.meta === 'object') {
+
+                    console.log(JSON.stringify(parsedTrx));
+
+                    let meta = parsedTrx.meta;
+                    let affectedNodes = meta.AffectedNodes;
+
+                    for(let i = 0; i < affectedNodes.length-1; i++) {
+                        let singleNode = affectedNodes[i];
+
+                        if(singleNode && isCreatedNode(singleNode)) {
+                            if(singleNode.CreatedNode.LedgerEntryType === 'RippleState' && singleNode.CreatedNode.NewFields.Balance && typeof singleNode.CreatedNode.NewFields.Balance === 'object') {
+                                let newFields:any = singleNode.CreatedNode.NewFields;
+                                let currency = newFields.Balance.currency;
+
+                                if(latestLiveRates.has(currency)) {
+                                    let rate = latestLiveRates.get(currency);
+
+                                    if(rate) {
+                                        let destination = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.issuer : newFields.LowLimit.issuer;
+                                        let tlValue = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.value : newFields.LowLimit.value;
+                                        let numberedTlValue = Number(tlValue);
+
+                                        await sendTokens(destination, currency, rate, numberedTlValue);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch(err) {
+        console.log("ERR analyzing incoming trustline");
+        console.log(err);
+        console.log(JSON.stringify(err));
+    }
+}
+
+async function sendTokens(destination:string, currency:string, rate:number, tlValue:number) {
+
+    try {
+
+        console.log("tlValue: " + tlValue);
+        console.log("rate: " + rate);
+
+        let valueToSend = sellWallAmountInXrp*0.01*rate;
+
+        console.log("valueToSend: " + valueToSend);
+
+        if(tlValue <= 0) {
+            valueToSend = 0;
+        } else if(tlValue/2 < valueToSend) {
+            valueToSend = tlValue/2
+        }
+
+        if(valueToSend > 0) {
+
+            let normalizedValue = normalizeBalance(valueToSend);
+
+            console.log("SEND: " + normalizedValue + " " + currency);
+
+            let paymentTrx:Payment = {
+                TransactionType: "Payment",
+                Account: wallet.classicAddress,
+                Destination: destination,
+                Amount: {
+                    currency: currency,
+                    issuer: wallet.classicAddress,
+                    value: normalizedValue
+                }
+            }
+
+            if(sendTokensClient && !sendTokensClient.isConnected()) {
+                await sendTokensClient.connect();
+            }
+
+            let submitResponse = await sendTokensClient.submit(paymentTrx, {wallet: wallet, autofill: true})
+
+            if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
+                //try again!
+                submitResponse = await sendTokensClient.submit(paymentTrx, {wallet: wallet, autofill: true})
+            }
+
+            await sendTokensClient.disconnect();
+        }
+    } catch(err) {
+        console.log("ERR SENDING TOKENS");
+        console.log(err);
+        console.log(JSON.stringify(err));
+    }
+
+    //console.log("BUY:")
+    //console.log(submitResponse);
 }
 
 function normalizeBalance(balance:number): string {
