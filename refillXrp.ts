@@ -50,7 +50,12 @@ async function refillXrp() {
             let info = accInfoResponse.result;
 
             if(info && info.account_data && info.account_data.Balance) {
-                let xrpBalance = Number(dropsToXrp(info.account_data.Balance));
+
+                let balance:number = Number(info.account_data.Balance);
+                balance = balance - 10000000; //deduct acc reserve
+                balance = balance - (info.account_data.OwnerCount * 2000000); //deduct owner count
+
+                let xrpBalance = Number(dropsToXrp(balance));
 
                 if(xrpBalance < 1000000) {
                     console.log("Low account balance. Refilling!")
