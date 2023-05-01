@@ -2,7 +2,7 @@ import { Client, AccountOffersRequest, Wallet, OfferCancel, AccountOffer } from 
 
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
-let submitClient = new Client('wss://testnet.xrpl-labs.com/')
+let submitClient = new Client('ws://127.0.0.1:6006')
 
 require("log-timestamp");
 

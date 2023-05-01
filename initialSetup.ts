@@ -2,7 +2,7 @@ import { Client, Wallet, AccountSet, AccountSetAsfFlags } from 'xrpl';
 
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
-let xrplClient = new Client('wss://testnet.xrpl-labs.com')
+let xrplClient = new Client('ws://127.0.0.1:6006')
 
 require("log-timestamp");
 
