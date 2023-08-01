@@ -4,7 +4,8 @@ import * as fetch from 'node-fetch';
 
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
-let xrplClient = new Client('ws://127.0.0.1:6006')
+let xrplClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006')
+let faucetURL = process.env.FAUCET_URL || "https://faucet.altnet.rippletest.net/accounts";
 
 require("log-timestamp");
 
@@ -17,12 +18,12 @@ async function start() {
         console.log(err);
     }
 
-    scheduleJob('xrplLiveRateOracle', { second: 0 } , () => refillXrp());
-    scheduleJob('xrplLiveRateOracle', { second: 10 } , () => refillXrp());
-    scheduleJob('xrplLiveRateOracle', { second: 20 } , () => refillXrp());
-    scheduleJob('xrplLiveRateOracle', { second: 30 } , () => refillXrp());
-    scheduleJob('xrplLiveRateOracle', { second: 40 } , () => refillXrp());
-    scheduleJob('xrplLiveRateOracle', { second: 50 } , () => refillXrp());
+    scheduleJob('refillXrp1', { second: 0 } , () => refillXrp());
+    scheduleJob('refillXrp2', { second: 10 } , () => refillXrp());
+    scheduleJob('refillXrp3', { second: 20 } , () => refillXrp());
+    scheduleJob('refillXrp4', { second: 30 } , () => refillXrp());
+    scheduleJob('refillXrp5', { second: 40 } , () => refillXrp());
+    scheduleJob('refillXrp6', { second: 50 } , () => refillXrp());
 
     console.log("refiller started!")
 }
@@ -59,7 +60,7 @@ async function refillXrp() {
 
                 if(xrpBalance < 1000000) {
                     console.log("Low account balance. Refilling!")
-                    let response = await fetch.default("https://faucet.altnet.rippletest.net/accounts", {method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({"destination": wallet.classicAddress})});
+                    let response = await fetch.default(faucetURL, {method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({"destination": wallet.classicAddress})});
 
                     if(response && response.ok) {
                         let jsonResponse = await response.json();

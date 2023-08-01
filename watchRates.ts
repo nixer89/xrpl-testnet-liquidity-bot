@@ -6,12 +6,12 @@ import * as fetch from 'node-fetch';
 import { isCreatedNode } from 'xrpl/dist/npm/models/transactions/metadata';
 
 let livenetClient = new XrplClient();
-let testnetClient = new XrplClient(['ws://127.0.0.1:6006','wss://testnet.xrpl-labs.com/', 'wss://s.altnet.rippletest.net:51233']);
+let testnetClient = new XrplClient(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
 let latestLiveRates:Map<string, number> = new Map();
-let submitClient = new Client('ws://127.0.0.1:6006');
-let sendTokensClient = new Client('ws://127.0.0.1:6006');
+let submitClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
+let sendTokensClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
 let sellWallAmountInXrp:number = 100000;
 
 require("log-timestamp");
