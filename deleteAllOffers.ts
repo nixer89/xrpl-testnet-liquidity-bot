@@ -45,7 +45,7 @@ async function deleteOffers() {
                 await cancelOldOffer(singleOffer.seq);
             }
 
-            submitClient.disconnect();
+            await submitClient.disconnect();
         }
     }
 }

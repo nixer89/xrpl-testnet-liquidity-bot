@@ -150,11 +150,14 @@ async function checkOffers() {
                         //check for sell offer!
                         let createNewOffers:boolean = true;
                         let lowXrpOfferAmount:boolean = false;
-                        let oldOffersToDelete:number[] = [];
+                        let oldSellOffersToDelete:number[] = [];
+                        let oldBuyOffersToDelete:number[] = [];
 
                         for(let i = 0; i < offers.length;i++) {
                             let singleOffer = offers[i];
                             if(typeof singleOffer.taker_gets === 'object' && typeof singleOffer.taker_pays === 'string') {
+
+                                //SELL OFFER
 
                                 let offerXrpAmount = Number(dropsToXrp(singleOffer.taker_pays));
 
@@ -170,17 +173,11 @@ async function checkOffers() {
 
                                     //console.log("diff: " + diff);
 
-                                    oldOffersToDelete.push(singleOffer.seq);
+                                    oldSellOffersToDelete.push(singleOffer.seq);
 
-                                    if('MYR' === currencyKey) {
-                                        if(diff <= 10) {
-                                            createNewOffers = false;    
-                                        }
-                                    } else {
-                                        if(diff <=2) {
-                                            //console.log("diff: " + diff);
-                                            createNewOffers = false;
-                                        }
+                                    if(diff <=2) {
+                                        //console.log("diff: " + diff);
+                                        createNewOffers = false;
                                     }
 
                                     if(offerXrpAmount < (sellWallAmountInXrp/2)) {
@@ -193,10 +190,12 @@ async function checkOffers() {
 
                             if(typeof singleOffer.taker_pays === 'object' && typeof singleOffer.taker_gets === 'string') {
 
+                                //BUY OFFER
+
                                 let offerXrpAmount = Number(dropsToXrp(singleOffer.taker_gets));
 
                                 if(currencyKey === singleOffer.taker_pays.currency) {
-                                    oldOffersToDelete.push(singleOffer.seq);
+                                    oldBuyOffersToDelete.push(singleOffer.seq);
 
                                     if(offerXrpAmount < (sellWallAmountInXrp/2)) {
                                         console.log(currencyKey+": BUY offerXrpAmount: " + offerXrpAmount);
@@ -206,18 +205,38 @@ async function checkOffers() {
                             }
                         }
 
-                        if(createNewOffers || oldOffersToDelete.length > 2 || lowXrpOfferAmount) { //no sell offer found. create it!
+                        if(createNewOffers || oldSellOffersToDelete.length > 1 || oldBuyOffersToDelete.length > 1 || lowXrpOfferAmount) { //no sell offer found. create it!
                             console.log("CREATING NEW OFFERS FOR " + currencyKey);
                             await sleep(500);
-                            await createSellOffer(currencyKey, liveRate*0.995)
-                            await sleep(500);
-                            await createBuyOffer(currencyKey, liveRate*1.005)
+                            if(oldSellOffersToDelete.length > 0) {
+                                await createSellOffer(currencyKey, liveRate*0.995, oldSellOffersToDelete[0]);
+                                oldSellOffersToDelete.shift();
+                            } else {
+                                await createSellOffer(currencyKey, liveRate*0.995);
+                            }
 
-                            if(oldOffersToDelete && oldOffersToDelete.length > 0) {
-                                console.log("DELETING OLD OFFERS");
+                            await sleep(500);
+
+                            if(oldBuyOffersToDelete.length > 0) {
+                                await createBuyOffer(currencyKey, liveRate*1.005, oldBuyOffersToDelete[0]);
+                                oldBuyOffersToDelete.shift();
+                            } else {
+                                await createBuyOffer(currencyKey, liveRate*1.005)
+                            }
+
+                            if(oldSellOffersToDelete && oldSellOffersToDelete.length > 0) {
+                                console.log("DELETING OLD SELL OFFERS");
                                 await sleep(500);
-                                for(let j = 0; j < oldOffersToDelete.length; j++) {
-                                    await cancelOldOffer(oldOffersToDelete[j]);
+                                for(let j = 0; j < oldSellOffersToDelete.length; j++) {
+                                    await cancelOldOffer(oldSellOffersToDelete[j]);
+                                }
+                            }
+
+                            if(oldBuyOffersToDelete && oldBuyOffersToDelete.length > 0) {
+                                console.log("DELETING OLD BUY OFFERS");
+                                await sleep(500);
+                                for(let j = 0; j < oldBuyOffersToDelete.length; j++) {
+                                    await cancelOldOffer(oldBuyOffersToDelete[j]);
                                 }
                             }
                         }
@@ -233,7 +252,7 @@ async function checkOffers() {
     }
 }
 
-async function createSellOffer(currency:string, rate:number) {
+async function createSellOffer(currency:string, rate:number, oldOfferSequence?: number) {
 
     let normalizedValue = normalizeBalance(sellWallAmountInXrp*rate);
 
@@ -251,6 +270,10 @@ async function createSellOffer(currency:string, rate:number) {
         Flags: OfferCreateFlags.tfSell
     }
 
+    if(oldOfferSequence && oldOfferSequence > 0) {
+        newOffer.OfferSequence = oldOfferSequence;
+    }
+
     let submitResponse = await submitClient.submit(newOffer, {wallet: wallet, autofill: true})
 
     if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
@@ -262,7 +285,7 @@ async function createSellOffer(currency:string, rate:number) {
     //console.log(submitResponse);
 }
 
-async function createBuyOffer(currency:string, rate:number) {
+async function createBuyOffer(currency:string, rate:number, oldOfferSequence?: number) {
 
     let normalizedValue = normalizeBalance(sellWallAmountInXrp*rate);
 
@@ -277,6 +300,10 @@ async function createBuyOffer(currency:string, rate:number) {
             value: normalizedValue
         },
         TakerGets: xrpToDrops(100000)
+    }
+
+    if(oldOfferSequence && oldOfferSequence > 0) {
+        newOffer.OfferSequence = oldOfferSequence;
     }
 
     let submitResponse = await submitClient.submit(newOffer, {wallet: wallet, autofill: true})
