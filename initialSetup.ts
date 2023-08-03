@@ -3,7 +3,7 @@ import { Client, Wallet, AccountSet, AccountSetAsfFlags } from 'xrpl';
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
 let xrplClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006')
-let networkId = Number(process.env.NETWORK_ID);
+let networkId = process.env.NETWORK_ID ? Number(process.env.NETWORK_ID) : null;
 
 require("log-timestamp");
 
@@ -21,8 +21,11 @@ async function start() {
         let setDefaultRipple:AccountSet = {
             TransactionType: "AccountSet",
             Account: wallet.classicAddress,
-            SetFlag: AccountSetAsfFlags.asfDefaultRipple,
-            NetworkID: networkId
+            SetFlag: AccountSetAsfFlags.asfDefaultRipple
+        }
+
+        if(networkId) {
+            setDefaultRipple.NetworkID = networkId;
         }
 
         let submitResponse = await xrplClient.submit(setDefaultRipple, {wallet: wallet, autofill: true})

@@ -11,7 +11,7 @@ let wallet = Wallet.fromSeed(seed);
 let latestLiveRates:Map<string, number> = new Map();
 let submitClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
 let sendTokensClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
-let networkId = Number(process.env.NETWORK_ID);
+let networkId = process.env.NETWORK_ID ? Number(process.env.NETWORK_ID) : null;
 let sellWallAmountInXrp:number = 100000;
 
 require("log-timestamp");
@@ -267,8 +267,11 @@ async function createSellOffer(currency:string, rate:number, oldOfferSequence?: 
             value: normalizedValue
         },
         TakerPays: xrpToDrops(sellWallAmountInXrp),
-        Flags: OfferCreateFlags.tfSell,
-        NetworkID: networkId
+        Flags: OfferCreateFlags.tfSell
+    }
+
+    if(networkId) {
+        newOffer.NetworkID = networkId;
     }
 
     if(oldOfferSequence && oldOfferSequence > 0) {
@@ -300,8 +303,11 @@ async function createBuyOffer(currency:string, rate:number, oldOfferSequence?: n
             issuer: wallet.classicAddress,
             value: normalizedValue
         },
-        TakerGets: xrpToDrops(100000),
-        NetworkID: networkId
+        TakerGets: xrpToDrops(100000)
+    }
+
+    if(networkId) {
+        newOffer.NetworkID = networkId;
     }
 
     if(oldOfferSequence && oldOfferSequence > 0) {
@@ -324,8 +330,11 @@ async function cancelOldOffer(sequence:number) {
     let offerCancel:OfferCancel = {
         TransactionType: "OfferCancel",
         Account: wallet.classicAddress,
-        OfferSequence: sequence,
-        NetworkID: networkId
+        OfferSequence: sequence
+    }
+
+    if(networkId) {
+        offerCancel.NetworkID = networkId;
     }
 
     let cancelOfferSubmit = await submitClient.submit(offerCancel, {wallet: wallet, autofill: true});
@@ -413,8 +422,11 @@ async function sendTokens(destination:string, currency:string, rate:number, tlVa
                     currency: currency,
                     issuer: wallet.classicAddress,
                     value: normalizedValue
-                },
-                NetworkID: networkId
+                }
+            }
+
+            if(networkId) {
+                paymentTrx.NetworkID = networkId;
             }
 
             if(sendTokensClient && !sendTokensClient.isConnected()) {
