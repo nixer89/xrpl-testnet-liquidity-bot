@@ -18,6 +18,7 @@ require("log-timestamp");
 
 async function start() {
     console.log("wallet: " , wallet);
+    console.log("networkId: " + networkId);
 
     await watchLiveRates();
     await checkOffers();
@@ -286,6 +287,7 @@ async function createSellOffer(currency:string, rate:number, oldOfferSequence?: 
 
         if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
             console.log(JSON.stringify(submitResponse));
+            console.log(newOffer);
         }
     }
 
@@ -326,6 +328,7 @@ async function createBuyOffer(currency:string, rate:number, oldOfferSequence?: n
 
         if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
             console.log(JSON.stringify(submitResponse));
+            console.log(newOffer);
         }
     }
 
@@ -353,6 +356,7 @@ async function cancelOldOffer(sequence:number) {
 
         if(!cancelOfferSubmit || !cancelOfferSubmit.result || cancelOfferSubmit.result.engine_result != 'tesSUCCESS') {
             console.log(JSON.stringify(cancelOfferSubmit));
+            console.log(offerCancel);
         }
     }
 }
@@ -453,6 +457,7 @@ async function sendTokens(destination:string, currency:string, rate:number, tlVa
 
                 if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
                     console.log(JSON.stringify(submitResponse));
+                    console.log(paymentTrx);
                 }
             }
 
