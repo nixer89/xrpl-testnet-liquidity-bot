@@ -1,6 +1,6 @@
 {
   "name": "xrpl-testnet-liquidity-bot",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Bot adding liquidity for specific currencies on the xrpl testnet",
   "main": "bot.js",
   "scripts": {

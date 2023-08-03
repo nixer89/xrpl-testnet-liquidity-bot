@@ -283,6 +283,10 @@ async function createSellOffer(currency:string, rate:number, oldOfferSequence?: 
     if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
         //try again!
         submitResponse = await submitClient.submit(newOffer, {wallet: wallet, autofill: true})
+
+        if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
+            console.log(JSON.stringify(submitResponse));
+        }
     }
 
     //console.log("SELL:")
@@ -319,6 +323,10 @@ async function createBuyOffer(currency:string, rate:number, oldOfferSequence?: n
     if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
         //try again!
         submitResponse = await submitClient.submit(newOffer, {wallet: wallet, autofill: true})
+
+        if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
+            console.log(JSON.stringify(submitResponse));
+        }
     }
 
     //console.log("BUY:")
@@ -341,7 +349,11 @@ async function cancelOldOffer(sequence:number) {
 
     if(!cancelOfferSubmit || !cancelOfferSubmit.result || cancelOfferSubmit.result.engine_result != 'tesSUCCESS') {
         //try again!
-        await submitClient.submit(offerCancel, {wallet: wallet, autofill: true})
+        cancelOfferSubmit = await submitClient.submit(offerCancel, {wallet: wallet, autofill: true})
+
+        if(!cancelOfferSubmit || !cancelOfferSubmit.result || cancelOfferSubmit.result.engine_result != 'tesSUCCESS') {
+            console.log(JSON.stringify(cancelOfferSubmit));
+        }
     }
 }
 
@@ -438,6 +450,10 @@ async function sendTokens(destination:string, currency:string, rate:number, tlVa
             if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
                 //try again!
                 submitResponse = await sendTokensClient.submit(paymentTrx, {wallet: wallet, autofill: true})
+
+                if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
+                    console.log(JSON.stringify(submitResponse));
+                }
             }
 
             await sendTokensClient.disconnect();
