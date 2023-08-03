@@ -1,7 +1,6 @@
-import { Client, AccountLinesRequest, AccountOffersRequest, OfferCreate, Wallet, OfferCancel, OfferCreateFlags, AccountOffer, dropsToXrp, xrpToDrops, Payment, SubscribeRequest, TransactionStream } from 'xrpl';
+import { Client, AccountLinesRequest, AccountOffersRequest, OfferCreate, Wallet, OfferCancel, OfferCreateFlags, AccountOffer, dropsToXrp, xrpToDrops, Payment, SubscribeRequest, TransactionStream, AccountLinesResponse, AccountLinesTrustline } from 'xrpl';
 import { XrplClient } from 'xrpl-client';
 import { scheduleJob } from 'node-schedule';
-import { Trustline } from 'xrpl/dist/npm/models/methods/accountLines';
 import * as fetch from 'node-fetch';
 import { isCreatedNode } from 'xrpl/dist/npm/models/transactions/metadata';
 
@@ -12,6 +11,7 @@ let wallet = Wallet.fromSeed(seed);
 let latestLiveRates:Map<string, number> = new Map();
 let submitClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
 let sendTokensClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
+let networkId = Number(process.env.NETWORK_ID);
 let sellWallAmountInXrp:number = 100000;
 
 require("log-timestamp");
@@ -61,7 +61,7 @@ async function watchLiveRates() {
             if(accountLinesResponse?.lines.length > 0) {
                 //console.log("FOUND LINES!");
 
-                let trustlines:Trustline[] = accountLinesResponse.lines;
+                let trustlines:AccountLinesTrustline[] = accountLinesResponse.lines;
                 for(let i = 0; i < trustlines.length; i++) {
                     let currency:string = trustlines[i].currency;
                     let rate:number = Math.abs(Number(trustlines[i].limit));
@@ -267,7 +267,8 @@ async function createSellOffer(currency:string, rate:number, oldOfferSequence?: 
             value: normalizedValue
         },
         TakerPays: xrpToDrops(sellWallAmountInXrp),
-        Flags: OfferCreateFlags.tfSell
+        Flags: OfferCreateFlags.tfSell,
+        NetworkID: networkId
     }
 
     if(oldOfferSequence && oldOfferSequence > 0) {
@@ -299,7 +300,8 @@ async function createBuyOffer(currency:string, rate:number, oldOfferSequence?: n
             issuer: wallet.classicAddress,
             value: normalizedValue
         },
-        TakerGets: xrpToDrops(100000)
+        TakerGets: xrpToDrops(100000),
+        NetworkID: networkId
     }
 
     if(oldOfferSequence && oldOfferSequence > 0) {
@@ -322,7 +324,8 @@ async function cancelOldOffer(sequence:number) {
     let offerCancel:OfferCancel = {
         TransactionType: "OfferCancel",
         Account: wallet.classicAddress,
-        OfferSequence: sequence
+        OfferSequence: sequence,
+        NetworkID: networkId
     }
 
     let cancelOfferSubmit = await submitClient.submit(offerCancel, {wallet: wallet, autofill: true});
@@ -410,7 +413,8 @@ async function sendTokens(destination:string, currency:string, rate:number, tlVa
                     currency: currency,
                     issuer: wallet.classicAddress,
                     value: normalizedValue
-                }
+                },
+                NetworkID: networkId
             }
 
             if(sendTokensClient && !sendTokensClient.isConnected()) {

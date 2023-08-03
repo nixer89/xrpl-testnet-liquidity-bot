@@ -3,6 +3,7 @@ import { Client, AccountOffersRequest, Wallet, OfferCancel, AccountOffer } from 
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
 let submitClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006')
+let networkId = Number(process.env.NETWORK_ID);
 
 require("log-timestamp");
 
@@ -55,7 +56,8 @@ async function cancelOldOffer(sequence:number) {
     let offerCancel:OfferCancel = {
         TransactionType: "OfferCancel",
         Account: wallet.classicAddress,
-        OfferSequence: sequence
+        OfferSequence: sequence,
+        NetworkID: networkId
     }
 
     let cancelOfferSubmit = await submitClient.submit(offerCancel, {wallet: wallet, autofill: true});
