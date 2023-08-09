@@ -3,6 +3,7 @@ import { XrplClient } from 'xrpl-client';
 import { scheduleJob } from 'node-schedule';
 import * as fetch from 'node-fetch';
 import { isCreatedNode } from 'xrpl/dist/npm/models/transactions/metadata';
+import * as fs from 'fs';
 
 let livenetClient = new XrplClient();
 let testnetClient = new XrplClient(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
@@ -16,9 +17,19 @@ let sellWallAmountInXrp:number = 100000;
 
 require("log-timestamp");
 
+let supportedApiCurrencies:string[] = ['BNB','BTC','CYN'];
+
 async function start() {
     console.log("wallet: " , wallet);
     console.log("networkId: " + networkId);
+
+    if(fs.existsSync("../apiCurrencies")) {
+        let currencies = JSON.parse(fs.readFileSync("../apiCurrencies").toString());
+
+        if(currencies && currencies.supported) {
+            supportedApiCurrencies = currencies.supported;
+        }
+    }
 
     await watchLiveRates();
     await checkOffers();
@@ -93,21 +104,18 @@ async function watchLiveRates() {
 
                 let currentPrice = marketData["current_price"];
 
-                //console.log(currentPrice);
+                let apiSupported:string[] = [];
+                for(let i = 0; i < supportedApiCurrencies.length; i++) {
+                    if(currentPrice[supportedApiCurrencies[i].toLowerCase()]) {
+                        //console.log("adding rate: " + "BNB" + " | " + currentPrice['bnb']);
+                        latestLiveRates.set(supportedApiCurrencies[i], currentPrice[supportedApiCurrencies[i].toLowerCase()]);
 
-                if(currentPrice['bnb']) {
-                    //console.log("adding rate: " + "BNB" + " | " + currentPrice['bnb']);
-                    latestLiveRates.set('BNB', currentPrice['bnb']);
+                        apiSupported.push(supportedApiCurrencies[i]);
+                    }
                 }
 
-                if(currentPrice['btc']) {
-                    //console.log("adding rate: " + "BTC" + " | " + currentPrice['btc']);
-                    latestLiveRates.set('BTC', currentPrice['btc']);
-                }
-
-                if(currentPrice['cny']) {
-                    //console.log("adding rate: " + "CNY" + " | " + currentPrice['cny']);
-                    latestLiveRates.set('CNY', currentPrice['cny']);
+                if(supportedApiCurrencies.length != apiSupported.length) {
+                    fs.writeFileSync("./apiCurrencies", JSON.stringify({supported: apiSupported}));
                 }
             }
 
@@ -392,6 +400,25 @@ async function handleIncomingTrustline(transaction:any) {
                                         let numberedTlValue = Number(tlValue);
 
                                         await sendTokens(destination, currency, rate, numberedTlValue);
+                                    }
+                                } else {
+                                    //try to fetch rate
+                                    supportedApiCurrencies.push(currency);
+                                    fs.writeFileSync("../apiCurrencies", JSON.stringify({supported: supportedApiCurrencies}));
+
+                                    await watchLiveRates();
+                                    await checkOffers();
+
+                                    if(latestLiveRates.has(currency)) {
+                                        let rate = latestLiveRates.get(currency);
+    
+                                        if(rate) {
+                                            let destination = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.issuer : newFields.LowLimit.issuer;
+                                            let tlValue = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.value : newFields.LowLimit.value;
+                                            let numberedTlValue = Number(tlValue);
+    
+                                            await sendTokens(destination, currency, rate, numberedTlValue);
+                                        }
                                     }
                                 }
                             }
