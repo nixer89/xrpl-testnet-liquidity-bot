@@ -76,6 +76,22 @@ async function refillXrp() {
     } catch(err) {
         console.log(err);
         console.log(JSON.stringify(err));
+
+        try {
+            console.log("Account not found. create it!")
+            //account probably not found. create it!
+            let response = await fetch.default(faucetURL, {method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({"destination": wallet.classicAddress})});
+
+            if(response && response.ok) {
+                let jsonResponse = await response.json();
+                console.log(jsonResponse);
+            } else {
+                console.log(response.status);
+                console.log(response.statusText);
+            }
+        } catch(err) {
+            console.log(err);
+        }
     }
 }
 
