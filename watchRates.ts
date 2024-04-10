@@ -420,12 +420,12 @@ async function handleIncomingTrustline(transaction:any) {
     
                                             await sendTokens(destination, currency, rate, numberedTlValue);
                                         }
-                                        
+
                                     } else {
                                         //seems like this is not supported!
-                                        const currCode = currency != humanReadableCurr ? (humanReadableCurr + " ( " + currency + " )") : currency;
+                                        const currCode = currency != humanReadableCurr ? ( '"' + humanReadableCurr + '"' + " ( " + currency + " )") : ( '"' + currency + '"');
                                         const memoType = "Liquidity-Bot-Info";
-                                        const memoText = "The currency code '" + currCode + "' is not supported yet.";
+                                        const memoText = "The currency code " + currCode + " is not supported yet.";
 
                                         let not_supported_message:Payment = {
                                             TransactionType: "Payment",
