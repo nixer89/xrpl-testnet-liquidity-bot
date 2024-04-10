@@ -1,13 +1,12 @@
 import { Client, Wallet, AccountInfoRequest, dropsToXrp } from 'xrpl';
 import { scheduleJob } from 'node-schedule';
 import * as fetch from 'node-fetch';
+import 'log-timestamp';
 
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
 let xrplClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006')
 let faucetURL = process.env.FAUCET_URL || "https://faucet.altnet.rippletest.net/accounts";
-
-require("log-timestamp");
 
 async function start() {
     console.log("wallet: " , wallet);

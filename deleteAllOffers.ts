@@ -1,11 +1,10 @@
 import { Client, AccountOffersRequest, Wallet, OfferCancel, AccountOffer } from 'xrpl';
+import 'log-timestamp';
 
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
 let submitClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006')
 let networkId = process.env.NETWORK_ID ? Number(process.env.NETWORK_ID) : null;
-
-require("log-timestamp");
 
 async function start() {
     console.log("deleting all offers...");

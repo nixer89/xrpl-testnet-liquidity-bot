@@ -4,6 +4,7 @@ import { scheduleJob } from 'node-schedule';
 import * as fetch from 'node-fetch';
 import { isCreatedNode } from 'xrpl/dist/npm/models/transactions/metadata';
 import * as fs from 'fs';
+import 'log-timestamp';
 
 let livenetClient = new XrplClient();
 let testnetClient = new XrplClient(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
@@ -14,8 +15,6 @@ let submitClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
 let sendTokensClient = new Client(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
 let networkId = process.env.NETWORK_ID ? Number(process.env.NETWORK_ID) : null;
 let sellWallAmountInXrp:number = 100000;
-
-require("log-timestamp");
 
 let supportedApiCurrencies:string[] = ['BNB','BTC','CYN'];
 
@@ -420,46 +419,46 @@ async function handleIncomingTrustline(transaction:any) {
                                             let numberedTlValue = Number(tlValue);
     
                                             await sendTokens(destination, currency, rate, numberedTlValue);
-                                        } else {
-                                            //seems like this is not supported!
-                                            const currCode = currency != humanReadableCurr ? (humanReadableCurr + " ( " + currency + " )") : currency;
-                                            const memoType = "Liquidity-Bot-Info";
-                                            const memoText = "The currency code '" + currCode + "' is not supported yet.";
+                                        }
+                                        
+                                    } else {
+                                        //seems like this is not supported!
+                                        const currCode = currency != humanReadableCurr ? (humanReadableCurr + " ( " + currency + " )") : currency;
+                                        const memoType = "Liquidity-Bot-Info";
+                                        const memoText = "The currency code '" + currCode + "' is not supported yet.";
 
-                                            let not_supported_message:Payment = {
-                                                TransactionType: "Payment",
-                                                Account: wallet.classicAddress,
-                                                Amount: "1",
-                                                Destination: destination,
-                                                Memos: [{Memo: {MemoType: Buffer.from(memoType, 'utf8').toString('hex').toUpperCase(), MemoData: Buffer.from(memoText, 'utf8').toString('hex').toUpperCase()}}]
-                                            }
+                                        let not_supported_message:Payment = {
+                                            TransactionType: "Payment",
+                                            Account: wallet.classicAddress,
+                                            Amount: "1",
+                                            Destination: destination,
+                                            Memos: [{Memo: {MemoType: Buffer.from(memoType, 'utf8').toString('hex').toUpperCase(), MemoData: Buffer.from(memoText, 'utf8').toString('hex').toUpperCase()}}]
+                                        }
 
-                                            if(networkId) {
-                                                not_supported_message.NetworkID = networkId;
-                                            }
-                                
+                                        if(networkId) {
+                                            not_supported_message.NetworkID = networkId;
+                                        }
+                            
+                                        if(sendTokensClient && !sendTokensClient.isConnected()) {
+                                            await sendTokensClient.connect();
+                                        }
+                            
+                                        let submitResponse = await sendTokensClient.submit(not_supported_message, {wallet: wallet, autofill: true})
+                            
+                                        if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
+                                            //try again!
                                             if(sendTokensClient && !sendTokensClient.isConnected()) {
                                                 await sendTokensClient.connect();
                                             }
-                                
-                                            let submitResponse = await sendTokensClient.submit(not_supported_message, {wallet: wallet, autofill: true})
-                                
+                                            submitResponse = await sendTokensClient.submit(not_supported_message, {wallet: wallet, autofill: true})
+                            
                                             if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
-                                                //try again!
-                                                if(sendTokensClient && !sendTokensClient.isConnected()) {
-                                                    await sendTokensClient.connect();
-                                                }
-                                                submitResponse = await sendTokensClient.submit(not_supported_message, {wallet: wallet, autofill: true})
-                                
-                                                if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
-                                                    console.log(JSON.stringify(submitResponse));
-                                                    console.log(not_supported_message);
-                                                }
+                                                console.log(JSON.stringify(submitResponse));
+                                                console.log(not_supported_message);
                                             }
-                                
-                                            await sendTokensClient.disconnect();
-
                                         }
+                            
+                                        await sendTokensClient.disconnect();
                                     }
                                 }
                             }
