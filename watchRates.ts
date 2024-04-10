@@ -106,9 +106,10 @@ async function watchLiveRates() {
 
                 let apiSupported:string[] = [];
                 for(let i = 0; i < supportedApiCurrencies.length; i++) {
-                    if(currentPrice[supportedApiCurrencies[i].toLowerCase()]) {
+                    let hurmanReadable = normalizeCurrencyCodeXummImpl(supportedApiCurrencies[i]);
+                    if(currentPrice[hurmanReadable.toLowerCase()]) {
                         //console.log("adding rate: " + "BNB" + " | " + currentPrice['bnb']);
-                        latestLiveRates.set(supportedApiCurrencies[i], currentPrice[supportedApiCurrencies[i].toLowerCase()]);
+                        latestLiveRates.set(supportedApiCurrencies[i], currentPrice[hurmanReadable.toLowerCase()]);
 
                         apiSupported.push(supportedApiCurrencies[i]);
                     }
@@ -390,12 +391,14 @@ async function handleIncomingTrustline(transaction:any) {
                             if(singleNode.CreatedNode.LedgerEntryType === 'RippleState' && singleNode.CreatedNode.NewFields.Balance && typeof singleNode.CreatedNode.NewFields.Balance === 'object') {
                                 let newFields:any = singleNode.CreatedNode.NewFields;
                                 let currency = newFields.Balance.currency;
+                                let humanReadableCurr = normalizeCurrencyCodeXummImpl(currency);
+
+                                let destination = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.issuer : newFields.LowLimit.issuer;
 
                                 if(latestLiveRates.has(currency)) {
                                     let rate = latestLiveRates.get(currency);
 
                                     if(rate) {
-                                        let destination = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.issuer : newFields.LowLimit.issuer;
                                         let tlValue = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.value : newFields.LowLimit.value;
                                         let numberedTlValue = Number(tlValue);
 
@@ -413,11 +416,49 @@ async function handleIncomingTrustline(transaction:any) {
                                         let rate = latestLiveRates.get(currency);
     
                                         if(rate) {
-                                            let destination = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.issuer : newFields.LowLimit.issuer;
                                             let tlValue = newFields.HighLimit.issuer != wallet.classicAddress ? newFields.HighLimit.value : newFields.LowLimit.value;
                                             let numberedTlValue = Number(tlValue);
     
                                             await sendTokens(destination, currency, rate, numberedTlValue);
+                                        } else {
+                                            //seems like this is not supported!
+                                            const currCode = currency != humanReadableCurr ? (humanReadableCurr + " ( " + currency + " )") : currency;
+                                            const memoType = "Liquidity-Bot-Info";
+                                            const memoText = "The currency code '" + currCode + "' is not supported yet.";
+
+                                            let not_supported_message:Payment = {
+                                                TransactionType: "Payment",
+                                                Account: wallet.classicAddress,
+                                                Amount: "1",
+                                                Destination: destination,
+                                                Memos: [{Memo: {MemoType: Buffer.from(memoType, 'utf8').toString('hex').toUpperCase(), MemoData: Buffer.from(memoText, 'utf8').toString('hex').toUpperCase()}}]
+                                            }
+
+                                            if(networkId) {
+                                                not_supported_message.NetworkID = networkId;
+                                            }
+                                
+                                            if(sendTokensClient && !sendTokensClient.isConnected()) {
+                                                await sendTokensClient.connect();
+                                            }
+                                
+                                            let submitResponse = await sendTokensClient.submit(not_supported_message, {wallet: wallet, autofill: true})
+                                
+                                            if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
+                                                //try again!
+                                                if(sendTokensClient && !sendTokensClient.isConnected()) {
+                                                    await sendTokensClient.connect();
+                                                }
+                                                submitResponse = await sendTokensClient.submit(not_supported_message, {wallet: wallet, autofill: true})
+                                
+                                                if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
+                                                    console.log(JSON.stringify(submitResponse));
+                                                    console.log(not_supported_message);
+                                                }
+                                            }
+                                
+                                            await sendTokensClient.disconnect();
+
                                         }
                                     }
                                 }
@@ -441,7 +482,7 @@ async function sendTokens(destination:string, currency:string, rate:number, tlVa
         console.log("tlValue: " + tlValue);
         console.log("rate: " + rate);
 
-        let valueToSend = sellWallAmountInXrp*0.01*rate;
+        let valueToSend = sellWallAmountInXrp*0.1*rate;
 
         console.log("valueToSend: " + valueToSend);
 
@@ -480,6 +521,9 @@ async function sendTokens(destination:string, currency:string, rate:number, tlVa
 
             if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
                 //try again!
+                if(sendTokensClient && !sendTokensClient.isConnected()) {
+                    await sendTokensClient.connect();
+                }
                 submitResponse = await sendTokensClient.submit(paymentTrx, {wallet: wallet, autofill: true})
 
                 if(!submitResponse || !submitResponse.result || submitResponse.result.engine_result != 'tesSUCCESS') {
@@ -520,5 +564,89 @@ function normalizeBalance(balance:number): string {
 function sleep(ms:number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+export function normalizeCurrencyCodeXummImpl(currencyCode: string, maxLength = 20): string {
+    if (!currencyCode) return '';
+
+    // Native XRP
+    if (currencyCode === 'XRP') {
+        return currencyCode;
+    }
+
+    // IOU claims as XRP which consider as fake XRP
+    if (currencyCode.toLowerCase() === 'xrp') {
+        return 'FakeXRP';
+    }
+
+    // IOU
+    // currency code is hex try to decode it
+    if (currencyCode.match(/^[A-F0-9]{40}$/)) {
+        let decoded:string|undefined = '';
+
+        // check for XLS15d
+        if (currencyCode.startsWith('02')) {
+            try {
+                const binary = HexEncoding.toBinary(currencyCode);
+                if(binary)
+                    decoded = binary.slice(8).toString('utf-8');
+            } catch {
+                decoded = HexEncoding.toString(currencyCode);
+            }
+        } else {
+            decoded = HexEncoding.toString(currencyCode);
+        }
+
+        if (decoded) {
+            // cleanup break lines and null bytes
+            const clean = decoded.replace(/\0/g, '').replace(/(\r\n|\n|\r)/gm, ' ');
+
+            // check if decoded contains xrp
+            if (clean.toLowerCase().trim() === 'xrp') {
+                return 'FakeXRP';
+            }
+            currencyCode = clean;
+
+            if(currencyCode === "USDT" || currencyCode === "USDC" || currencyCode === "DAI") {
+                currencyCode = "USD";
+            }
+
+            if(currencyCode === "EURT" || currencyCode === "EURt" || currencyCode === "EURC" || currencyCode === "EURS") {
+                currencyCode = "EUR";
+            }
+        }
+
+        // if not decoded then return hex value
+        return currencyCode;
+    }
+
+    return currencyCode;
+};
+
+/* Hex Encoding  ==================================================================== */
+const HexEncoding = {
+    toBinary: (hex: string): Buffer | undefined => {
+        return hex ? Buffer.from(hex, 'hex') : undefined;
+    },
+
+    toString: (hex: string): string | undefined => {
+        return hex ? Buffer.from(hex, 'hex').toString('utf8') : undefined;
+    },
+
+    toHex: (text: string): string | undefined => {
+        return text ? Buffer.from(text).toString('hex') : undefined;
+    },
+
+    toUTF8: (hex: string): string | undefined => {
+        if (!hex) return undefined;
+
+        const buffer = Buffer.from(hex, 'hex');
+        const isValid = Buffer.compare(Buffer.from(buffer.toString(), 'utf8'), buffer) === 0;
+
+        if (isValid) {
+            return buffer.toString('utf8');
+        }
+        return hex;
+    },
+};
 
 start();
