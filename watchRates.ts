@@ -196,13 +196,13 @@ async function checkOffers() {
                                     let offerRate = Number((Number(singleOffer.quality)/1000000).toFixed(12));
                                     let convertedLiveRate = 1/liveRate;
 
-                                    //console.log("currency: " + currencyKey);
-                                    //console.log("offer rate: " + offerRate);
-                                    //console.log("convertedLiveRate: " + convertedLiveRate);
+                                    console.log("currency: " + currencyKey);
+                                    console.log("offer rate: " + offerRate);
+                                    console.log("convertedLiveRate: " + convertedLiveRate);
 
                                     let diff = Math.abs((offerRate * 100 / convertedLiveRate) - 100)
 
-                                    //console.log("diff: " + diff);
+                                    console.log("diff: " + diff);
 
                                     oldSellOffersToDelete.push(singleOffer.seq);
 
