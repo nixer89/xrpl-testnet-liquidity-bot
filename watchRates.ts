@@ -6,7 +6,7 @@ import { isCreatedNode } from 'xrpl/dist/npm/models/transactions/metadata';
 import * as fs from 'fs';
 import 'log-timestamp';
 
-let livenetClient = new XrplClient();
+let livenetClient = new XrplClient(process.env.MAIN_NET_SERVER || 'ws://127.0.0.1:6006');
 let testnetClient = new XrplClient(process.env.XRPL_SERVER || 'ws://127.0.0.1:6006');
 let seed:string = process.env.ACCOUNT_SEED || '';
 let wallet = Wallet.fromSeed(seed);
@@ -30,16 +30,28 @@ async function start() {
         }
     }
 
+    await testnetClient.ready();
+
     await watchLiveRates();
     await checkOffers();
 
     let subscribeAccount:SubscribeRequest = {
         command: 'subscribe',
-        accounts: [wallet.classicAddress]
+        streams: ['ledger']
     }
 
-    testnetClient.on('transaction', trx => {
-        handleIncomingTrustline(trx);
+    testnetClient.on('ledger', ledger  => {
+        handleLedgerClosed(ledger.result.ledger_index);
+    });
+
+    testnetClient.on('error', err => {
+        console.log("error: " + err);
+        process.exit(0);
+    });
+
+    testnetClient.on('close', () => {
+        console.log("closed!");
+        process.exit(0);
     });
 
     await testnetClient.send(subscribeAccount);
@@ -56,11 +68,13 @@ async function watchLiveRates() {
 
     try {
 
+        await livenetClient.ready();
+
         //console.log("calling XRPL...")
 
         let accountLinesRequest:AccountLinesRequest = {
             command: 'account_lines',
-            account: 'rpXCfDds782Bd6eK9Hsn15RDnGMtxf752m',
+            account: 'r3PDXzXky6gboMrwurmSCiUyhzdrFyAbfu',
             limit: 400
         }
 
@@ -69,7 +83,7 @@ async function watchLiveRates() {
 
         if(accountLinesResponse) {
 
-            if(accountLinesResponse?.lines.length > 0) {
+            if(accountLinesResponse?.lines?.length > 0) {
                 //console.log("FOUND LINES!");
 
                 let trustlines:AccountLinesTrustline[] = accountLinesResponse.lines;
@@ -83,8 +97,15 @@ async function watchLiveRates() {
                 }
 
                 //console.log("oracle data updated");
+            } else {
+                console.log("no lines found!");
+                console.log(JSON.stringify(accountLinesResponse));
             }
         }
+
+        livenetClient.close();
+        livenetClient.destroy();
+
     } catch(err) {
         console.log("ERR CALLING XRPL");
         console.log(err);
@@ -128,6 +149,7 @@ async function watchLiveRates() {
 }
 
 async function checkOffers() {
+
     let accountOfferRequest:AccountOffersRequest = {
         command: 'account_offers',
         account: wallet.classicAddress,
@@ -369,6 +391,33 @@ async function cancelOldOffer(sequence:number) {
     }
 }
 
+async function handleLedgerClosed(ledgerIndex: number) {
+    try {
+        let ledgerRequest = {
+            command: 'ledger',
+            ledger_index: ledgerIndex,
+            transactions: true,
+            expand: true
+        }
+
+        let ledgerResponse = await testnetClient.send(ledgerRequest);
+
+        if(ledgerResponse && ledgerResponse.ledger && ledgerResponse.ledger.transactions) {
+            let transactions = ledgerResponse.ledger.transactions;
+
+            for(let i = 0; i < transactions.length; i++) {
+                let transaction = transactions[i];
+
+                if(transaction && transaction.TransactionType === 'TrustSet' && transaction.Account === wallet.classicAddress ) {
+                    handleIncomingTrustline(transaction);
+                }
+            }
+        }
+    } catch(err) {
+        console.log(err);
+    }
+}
+
 async function handleIncomingTrustline(transaction:any) {
 
     try {
@@ -405,11 +454,13 @@ async function handleIncomingTrustline(transaction:any) {
                                     }
                                 } else {
                                     //try to fetch rate
-                                    supportedApiCurrencies.push(currency);
-                                    fs.writeFileSync("../apiCurrencies", JSON.stringify({supported: supportedApiCurrencies}));
+                                    if(!supportedApiCurrencies.includes(currency)) {
+                                        supportedApiCurrencies.push(currency);
+                                        fs.writeFileSync("../apiCurrencies", JSON.stringify({supported: supportedApiCurrencies}));
 
-                                    await watchLiveRates();
-                                    await checkOffers();
+                                        await watchLiveRates();
+                                        await checkOffers();
+                                    }
 
                                     if(latestLiveRates.has(currency)) {
                                         let rate = latestLiveRates.get(currency);
