@@ -84,19 +84,19 @@ async function watchLiveRates() {
         if(accountLinesResponse) {
 
             if(accountLinesResponse?.lines?.length > 0) {
-                //console.log("FOUND LINES!");
+                console.log("FOUND LINES!");
 
                 let trustlines:AccountLinesTrustline[] = accountLinesResponse.lines;
                 for(let i = 0; i < trustlines.length; i++) {
                     let currency:string = trustlines[i].currency;
                     let rate:number = Math.abs(Number(trustlines[i].limit));
 
-                    //console.log("adding rate: " + currency + " | " + rate);
+                    console.log("adding rate: " + currency + " | " + rate);
 
                     latestLiveRates.set(currency, rate);
                 }
 
-                //console.log("oracle data updated");
+                console.log("oracle data updated");
             } else {
                 console.log("no lines found!");
                 console.log(JSON.stringify(accountLinesResponse));
